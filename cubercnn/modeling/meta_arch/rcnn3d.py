@@ -18,9 +18,11 @@ from detectron2.modeling.meta_arch import (
 from cubercnn.modeling.roi_heads import build_roi_heads
 
 from detectron2.data import MetadataCatalog
+from detectron2.structures import ImageList
 from pytorch3d.transforms import rotation_6d_to_matrix
 from cubercnn.modeling.roi_heads import build_roi_heads
 from cubercnn import util, vis
+from collections import Counter
 
 @META_ARCH_REGISTRY.register()
 class RCNN3D(GeneralizedRCNN):
@@ -37,6 +39,18 @@ class RCNN3D(GeneralizedRCNN):
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
         }
+    def preprocess_depth(self, batched_inputs: List[Dict[str, torch.Tensor]]):
+        """
+        Normalize, pad and batch the input images.
+        """
+        images = [self._move_to_current_device(x["depth"]) for x in batched_inputs]
+        images = [(x - self.pixel_mean) / self.pixel_std for x in images]
+        images = ImageList.from_tensors(
+            images,
+            self.backbone.size_divisibility,
+            padding_constraints=self.backbone.padding_constraints,
+        )
+        return images
 
     def forward(self, batched_inputs: List[Dict[str, torch.Tensor]]):
         
@@ -44,6 +58,8 @@ class RCNN3D(GeneralizedRCNN):
             return self.inference(batched_inputs)
 
         images = self.preprocess_image(batched_inputs)
+
+        depths = self.preprocess_depth(batched_inputs)
 
         # scaling factor for the sample relative to its original scale
         # e.g., how much has the image been upsampled by? or downsampled?
@@ -56,8 +72,9 @@ class RCNN3D(GeneralizedRCNN):
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
-
-        features = self.backbone(images.tensor)
+        features1 = self.backbone(images.tensor)
+        features2 = self.backbone(depths.tensor)
+        features = {k: features1.get(k, 0) + features2.get(k, 0) for k in set(features1) | set(features2)}
         proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
 
         instances, detector_losses = self.roi_heads(
@@ -86,15 +103,23 @@ class RCNN3D(GeneralizedRCNN):
 
         images = self.preprocess_image(batched_inputs)
 
+        depths = self.preprocess_depth(batched_inputs)
+
         # scaling factor for the sample relative to its original scale
         # e.g., how much has the image been upsampled by? or downsampled?
         im_scales_ratio = [info['height'] / im.shape[1] for (info, im) in zip(batched_inputs, images)]
-        
+
         # The unmodified intrinsics for the image
         Ks = [torch.FloatTensor(info['K']) for info in batched_inputs]
 
-        features = self.backbone(images.tensor)
-
+        if "instances" in batched_inputs[0]:
+            gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
+        else:
+            gt_instances = None
+        features1 = self.backbone(images.tensor)
+        features2 = self.backbone(depths.tensor)
+        features = {k: features1.get(k, 0) + features2.get(k, 0) for k in set(features1) | set(features2)}
+        
         # Pass oracle 2D boxes into the RoI heads
         if type(batched_inputs == list) and np.any(['oracle2D' in b for b in batched_inputs]):
             oracles = [b['oracle2D'] for b in batched_inputs]
