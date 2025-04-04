@@ -30,13 +30,14 @@ class RCNN3D(GeneralizedRCNN):
 
     def __init__(
         self,
+        cfg,
         *,
-        backbone: Backbone,
-        depth_backbone: Backbone,
-        proposal_generator: nn.Module,
-        roi_heads: nn.Module,
-        pixel_mean: Tuple[float],
-        pixel_std: Tuple[float],
+        backbone: Backbone = None,
+        depth_backbone: Backbone = None,
+        proposal_generator: nn.Module = None,
+        roi_heads: nn.Module = None,
+        pixel_mean: Tuple[float] = None,
+        pixel_std: Tuple[float] = None,
         input_format: Optional[str] = None,
         vis_period: int = 0,
         priors = None
