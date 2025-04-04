@@ -26,12 +26,54 @@ from collections import Counter
 
 @META_ARCH_REGISTRY.register()
 class RCNN3D(GeneralizedRCNN):
+
+    @configurable
+    def __init__(
+        self,
+        *,
+        backbone: Backbone,
+        depth_backbone: Backbone,
+        proposal_generator: nn.Module,
+        roi_heads: nn.Module,
+        pixel_mean: Tuple[float],
+        pixel_std: Tuple[float],
+        input_format: Optional[str] = None,
+        vis_period: int = 0,
+    ):
+        """
+        Args:
+            backbone: a backbone module, must follow detectron2's backbone interface
+            proposal_generator: a module that generates proposals using backbone features
+            roi_heads: a ROI head that performs per-region computation
+            pixel_mean, pixel_std: list or tuple with #channels element, representing
+                the per-channel mean and std to be used to normalize the input image
+            input_format: describe the meaning of channels of input. Needed by visualization
+            vis_period: the period to run visualization. Set to 0 to disable.
+        """
+        super().__init__()
+        self.backbone = backbone
+        self.depth_backbone = depth_backbone
+        self.proposal_generator = proposal_generator
+        self.roi_heads = roi_heads
+
+        self.input_format = input_format
+        self.vis_period = vis_period
+        if vis_period > 0:
+            assert input_format is not None, "input_format is required for visualization!"
+
+        self.register_buffer("pixel_mean", torch.tensor(pixel_mean).view(-1, 1, 1), False)
+        self.register_buffer("pixel_std", torch.tensor(pixel_std).view(-1, 1, 1), False)
+        assert (
+            self.pixel_mean.shape == self.pixel_std.shape
+        ), f"{self.pixel_mean} and {self.pixel_std} have different shapes!"
     
     @classmethod
     def from_config(cls, cfg, priors=None):
         backbone = build_backbone(cfg, priors=priors)
+        depth_backbone = build_depth_backbone(cfg, priors=priors)
         return {
             "backbone": backbone,
+            "depth_backbone": depth_backbone,
             "proposal_generator": build_proposal_generator(cfg, backbone.output_shape()),
             "roi_heads": build_roi_heads(cfg, backbone.output_shape(), priors=priors),
             "input_format": cfg.INPUT.FORMAT,
@@ -39,6 +81,7 @@ class RCNN3D(GeneralizedRCNN):
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
         }
+    
     def preprocess_depth(self, batched_inputs: List[Dict[str, torch.Tensor]]):
         """
         Normalize, pad and batch the input images.
@@ -73,7 +116,7 @@ class RCNN3D(GeneralizedRCNN):
         else:
             gt_instances = None
         features1 = self.backbone(images.tensor)
-        features2 = self.backbone(depths.tensor)
+        features2 = self.depth_backbone(depths.tensor)
         features = {k: features1.get(k, 0) + features2.get(k, 0) for k in set(features1) | set(features2)}
         proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
 
@@ -117,7 +160,7 @@ class RCNN3D(GeneralizedRCNN):
         else:
             gt_instances = None
         features1 = self.backbone(images.tensor)
-        features2 = self.backbone(depths.tensor)
+        features2 = self.depth_backbone(depths.tensor)
         features = {k: features1.get(k, 0) + features2.get(k, 0) for k in set(features1) | set(features2)}
         
         # Pass oracle 2D boxes into the RoI heads
