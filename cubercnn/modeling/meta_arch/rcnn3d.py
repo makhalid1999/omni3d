@@ -72,7 +72,7 @@ class RCNN3D(GeneralizedRCNN):
     @classmethod
     def from_config(cls, cfg, priors=None):
         backbone = build_backbone(cfg, priors=priors)
-        depth_backbone = build_depth_backbone(cfg, priors=priors)
+        depth_backbone = build_backbone(cfg, priors=priors)
         return {
             "backbone": backbone,
             "depth_backbone": depth_backbone,
