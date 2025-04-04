@@ -28,19 +28,18 @@ from collections import Counter
 @META_ARCH_REGISTRY.register()
 class RCNN3D(GeneralizedRCNN):
 
+    @configurable
     def __init__(
         self,
-        cfg,
         *,
         backbone: Backbone = None,
         depth_backbone: Backbone = None,
-        proposal_generator: nn.Module = None,
-        roi_heads: nn.Module = None,
-        pixel_mean: Tuple[float] = None,
-        pixel_std: Tuple[float] = None,
+        proposal_generator: nn.Module,
+        roi_heads: nn.Module,
+        pixel_mean: Tuple[float],
+        pixel_std: Tuple[float],
         input_format: Optional[str] = None,
         vis_period: int = 0,
-        priors = None
     ):
         """
         Args:
