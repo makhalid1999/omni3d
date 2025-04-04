@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 import numpy as np
+from detectron2.config import configurable
 from detectron2.layers import ShapeSpec, batched_nms
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data.detection_utils import convert_image_to_rgb
