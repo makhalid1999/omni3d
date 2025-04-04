@@ -39,6 +39,7 @@ class RCNN3D(GeneralizedRCNN):
         pixel_std: Tuple[float],
         input_format: Optional[str] = None,
         vis_period: int = 0,
+        priors = None
     ):
         """
         Args:
