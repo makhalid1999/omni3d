@@ -27,7 +27,6 @@ from collections import Counter
 @META_ARCH_REGISTRY.register()
 class RCNN3D(GeneralizedRCNN):
 
-    @configurable
     def __init__(
         self,
         *,
@@ -50,7 +49,7 @@ class RCNN3D(GeneralizedRCNN):
             input_format: describe the meaning of channels of input. Needed by visualization
             vis_period: the period to run visualization. Set to 0 to disable.
         """
-        super().__init__()
+        super(GeneralizedRCNN, self).__init__()
         self.backbone = backbone
         self.depth_backbone = depth_backbone
         self.proposal_generator = proposal_generator
