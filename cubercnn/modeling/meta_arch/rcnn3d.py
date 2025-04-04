@@ -1,6 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates
 from typing import Dict, List, Optional
 import torch
+import torch.nn as nn
 import numpy as np
 from detectron2.layers import ShapeSpec, batched_nms
 from detectron2.utils.visualizer import Visualizer
