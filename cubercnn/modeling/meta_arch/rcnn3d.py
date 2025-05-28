@@ -2,6 +2,7 @@
 from typing import Dict, List, Optional
 import torch
 import numpy as np
+import math
 from detectron2.layers import ShapeSpec, batched_nms
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data.detection_utils import convert_image_to_rgb
@@ -86,6 +87,7 @@ class RCNN3D(GeneralizedRCNN):
         assert not self.training
 
         images = self.preprocess_image(batched_inputs)
+        depths = self.preprocess_depths(batched_inputs)
 
         # scaling factor for the sample relative to its original scale
         # e.g., how much has the image been upsampled by? or downsampled?
@@ -94,8 +96,8 @@ class RCNN3D(GeneralizedRCNN):
         # The unmodified intrinsics for the image
         Ks = [torch.FloatTensor(info['K']) for info in batched_inputs]
 
-        features = self.backbone(images.tensor)
-
+        features = self.backbone([images.tensor, depths])
+        
         # Pass oracle 2D boxes into the RoI heads
         if type(batched_inputs == list) and np.any(['oracle2D' in b for b in batched_inputs]):
             oracles = [b['oracle2D'] for b in batched_inputs]
@@ -115,7 +117,12 @@ class RCNN3D(GeneralizedRCNN):
     def preprocess_depths(self, batched_inputs):
         depths = [batched_input['depth'] for batched_input in batched_inputs]
         depths = torch.stack(depths)
-        return depths
+        b, c, w, h = depths.shape
+        w_ = math.ceil(w/32)*32
+        h_ = math.ceil(h/32)*32
+        new_depths = torch.zeros(b, c, w_, h_).to('cuda')
+        new_depths[:, :, :w, :h] = depths
+        return new_depths
 
     def visualize_training(self, batched_inputs, proposals, instances):
         """
