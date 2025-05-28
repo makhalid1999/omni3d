@@ -238,8 +238,13 @@ class DLA(nn.Module):
         self.channels = channels
         self.return_levels = return_levels
         self.num_classes = num_classes
-        self.base_layer = nn.Sequential(
+        self.base_layer_rgb = nn.Sequential(
             nn.Conv2d(3, channels[0], kernel_size=7, stride=1,
+                      padding=3, bias=False),
+            BatchNorm(channels[0]),
+            nn.ReLU(inplace=True))
+        self.base_layer_depth = nn.Sequential(
+            nn.Conv2d(1, channels[0], kernel_size=7, stride=1,
                       padding=3, bias=False),
             BatchNorm(channels[0]),
             nn.ReLU(inplace=True))
@@ -449,7 +454,8 @@ class DLABackbone(Backbone):
             base  = dla169(pretrained=pretrained)
             self._out_feature_channels = {'p2': 128, 'p3': 256, 'p4': 512, 'p5': 1024, 'p6': 1024}
 
-        self.base_layer = base.base_layer
+        self.base_layer_rgb = base.base_layer_rgb
+        self.base_layer_depth = base.base_layer_depth
         self.level0 = base.level0
         self.level1 = base.level1
         self.level2 = base.level2
@@ -463,9 +469,12 @@ class DLABackbone(Backbone):
     def forward(self, x):
 
         outputs = {}
+        rgb = x[0]
+        depth = x[1]
         
-        base_layer = self.base_layer(x)
-        level0 = self.level0(base_layer)
+        base_layer_rgb = self.base_layer_rgb(rgb)
+        base_layer_depth = self.base_layer_depth(depth)
+        level0 = self.level0(base_layer_rgb + base_layer_depth)
         level1 = self.level1(level0)
         level2 = self.level2(level1)
         level3 = self.level3(level2)
@@ -491,7 +500,7 @@ def build_dla_from_vision_fpn_backbone(cfg, input_shape: ShapeSpec, priors=None)
         backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
     """
 
-    imagenet_pretrain = cfg.MODEL.WEIGHTS_PRETRAIN + cfg.MODEL.WEIGHTS == ''
+    imagenet_pretrain = False
 
     bottom_up = DLABackbone(cfg, input_shape, pretrained=imagenet_pretrain)
     in_features = cfg.MODEL.FPN.IN_FEATURES
