@@ -45,7 +45,13 @@ class RCNN3D(GeneralizedRCNN):
         if not self.training:
             return self.inference(batched_inputs)
 
+        if type(self.backbone) == list:
+            self.backbone_depth = self.backbone[1]
+            self.backbone_depth.to('cuda')
+            self.backbone = self.backbone[0]
+            self.backbone.to('cuda')
         images = self.preprocess_image(batched_inputs)
+        depths = self.preprocess_depths(batched_inputs)
 
         # scaling factor for the sample relative to its original scale
         # e.g., how much has the image been upsampled by? or downsampled?
@@ -59,7 +65,7 @@ class RCNN3D(GeneralizedRCNN):
         else:
             gt_instances = None
 
-        features = self.backbone[0](images.tensor) + self.backbone[1](batched_inputs['depth'])
+        features = self.backbone(images.tensor) + self.backbone_depth(depths)
         proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
 
         instances, detector_losses = self.roi_heads(
@@ -113,6 +119,10 @@ class RCNN3D(GeneralizedRCNN):
         else:
             return results
 
+    def preprocess_depths(self, batched_inputs):
+        depths = [batched_input['depth'] for batched_input in batched_inputs]
+        depths = torch.stack(depths)
+        return depths
     def visualize_training(self, batched_inputs, proposals, instances):
         """
         A function used to visualize images and proposals. It shows ground truth
@@ -286,5 +296,5 @@ def build_backbone_depth(cfg, input_shape=None, priors=None):
     backbone_name = cfg.MODEL.BACKBONE.NAME
     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg, input_shape, priors)
     assert isinstance(backbone, Backbone)
-    backbone.bottom_up.base_layer[0] = torch.nn.Conv2d(1, 16, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False)
+    backbone.bottom_up.base_layer[0] = torch.nn.Conv2d(1, 16, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False).to('cuda')
     return backbone
