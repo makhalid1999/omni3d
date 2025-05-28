@@ -28,12 +28,10 @@ class RCNN3D(GeneralizedRCNN):
     @classmethod
     def from_config(cls, cfg, priors=None):
         backbone = build_backbone(cfg, priors=priors)
-        backbone1 = build_backbone_depth(cfg, priors=priors)
-        backbone = [backbone, backbone1]
         return {
             "backbone": backbone,
-            "proposal_generator": build_proposal_generator(cfg, backbone[0].output_shape()),
-            "roi_heads": build_roi_heads(cfg, backbone[0].output_shape(), priors=priors),
+            "proposal_generator": build_proposal_generator(cfg, backbone.output_shape()),
+            "roi_heads": build_roi_heads(cfg, backbone.output_shape(), priors=priors),
             "input_format": cfg.INPUT.FORMAT,
             "vis_period": cfg.VIS_PERIOD,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
@@ -45,11 +43,6 @@ class RCNN3D(GeneralizedRCNN):
         if not self.training:
             return self.inference(batched_inputs)
 
-        if type(self.backbone) == list:
-            self.backbone_depth = self.backbone[1]
-            self.backbone_depth.to('cuda')
-            self.backbone = self.backbone[0]
-            self.backbone.to('cuda')
         images = self.preprocess_image(batched_inputs)
         depths = self.preprocess_depths(batched_inputs)
 
@@ -65,7 +58,7 @@ class RCNN3D(GeneralizedRCNN):
         else:
             gt_instances = None
 
-        features = self.backbone(images.tensor) + self.backbone_depth(depths)
+        features = self.backbone([images.tensor, depths])
         proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
 
         instances, detector_losses = self.roi_heads(
@@ -123,6 +116,7 @@ class RCNN3D(GeneralizedRCNN):
         depths = [batched_input['depth'] for batched_input in batched_inputs]
         depths = torch.stack(depths)
         return depths
+
     def visualize_training(self, batched_inputs, proposals, instances):
         """
         A function used to visualize images and proposals. It shows ground truth
@@ -281,20 +275,4 @@ def build_backbone(cfg, input_shape=None, priors=None):
     backbone_name = cfg.MODEL.BACKBONE.NAME
     backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg, input_shape, priors)
     assert isinstance(backbone, Backbone)
-    return backbone
-
-def build_backbone_depth(cfg, input_shape=None, priors=None):
-    """
-    Build a backbone from `cfg.MODEL.BACKBONE.NAME`.
-
-    Returns:
-        an instance of :class:`Backbone`
-    """
-    if input_shape is None:
-        input_shape = ShapeSpec(channels=len(cfg.MODEL.PIXEL_MEAN))
-
-    backbone_name = cfg.MODEL.BACKBONE.NAME
-    backbone = BACKBONE_REGISTRY.get(backbone_name)(cfg, input_shape, priors)
-    assert isinstance(backbone, Backbone)
-    backbone.bottom_up.base_layer[0] = torch.nn.Conv2d(1, 16, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False).to('cuda')
     return backbone
