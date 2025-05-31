@@ -5,6 +5,8 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+import requests
+import io
 import torch.utils.model_zoo as model_zoo
 import torch.nn.functional as F
 import detectron2.utils.comm as comm
@@ -308,7 +310,9 @@ class DLA(nn.Module):
         # to prevent redundent model caching
         if comm.is_main_process():
             model_url = get_model_url(data, name, hash)
-            model_weights = model_zoo.load_url(model_url)
+            response = requests.get(model_url)
+            buffer = io.BytesIO(response.content)
+            model_weights = torch.load(buffer, map_location="cuda")
             del model_weights['fc.weight']
             del model_weights['fc.bias']
             self.load_state_dict(model_weights)
