@@ -28,7 +28,7 @@ Adapted models from repositories
 """
 
 def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
-    return os.path.join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
+    return os.path.join('https://web.archive.org/web/20240314125141/http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -500,7 +500,7 @@ def build_dla_from_vision_fpn_backbone(cfg, input_shape: ShapeSpec, priors=None)
         backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
     """
 
-    imagenet_pretrain = False
+    imagenet_pretrain = cfg.MODEL.WEIGHTS_PRETRAIN + cfg.MODEL.WEIGHTS == ''
 
     bottom_up = DLABackbone(cfg, input_shape, pretrained=imagenet_pretrain)
     in_features = cfg.MODEL.FPN.IN_FEATURES
