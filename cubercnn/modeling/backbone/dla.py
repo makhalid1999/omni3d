@@ -30,7 +30,7 @@ Adapted models from repositories
 """
 
 def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
-    return os.path.join('https://web.archive.org/web/20240314125141/http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
+    return os.path.join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
 
 
 def conv3x3(in_planes, out_planes, stride=1):
